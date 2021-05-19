@@ -5,7 +5,8 @@ import (
 )
 
 type EncoderLSH interface {
-	Encode(vec []float64) (uint32, error)
+	Encode(vec []float64) (uint64, error)
+	Len() int
 }
 
 func GetAngle(vec1, vec2 []float64) float64 {

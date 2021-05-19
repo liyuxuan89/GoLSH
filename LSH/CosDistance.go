@@ -6,8 +6,8 @@ import (
 )
 
 type CosDistanceEncoder struct {
-	base [][]float64
-	vecLen int
+	base    [][]float64
+	vecLen  int
 	baseNum int
 }
 
@@ -22,9 +22,9 @@ func NewCosDistanceEncoder(vecLen int, baseNum int) *CosDistanceEncoder {
 		}
 	}
 	return &CosDistanceEncoder{
-		base: base,
+		base:    base,
 		baseNum: baseNum,
-		vecLen: vecLen,
+		vecLen:  vecLen,
 	}
 }
 
@@ -41,4 +41,8 @@ func (c *CosDistanceEncoder) Encode(vec []float64) (uint64, error) {
 		mask = mask << 1
 	}
 	return enc, nil
+}
+
+func (c *CosDistanceEncoder) Len() int {
+	return c.baseNum
 }

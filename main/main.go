@@ -2,15 +2,16 @@ package main
 
 import (
 	"fmt"
+	"geeSearch/LSH"
 	"geeSearch/vectorDatabase"
 )
 
 func main() {
-
-	db, err := vectorDatabase.NewVectorDb("mysql", "root:123456@tcp(localhost:3306)/test_db?charset=utf8")
+	// username:password@protocol(address)/dbname?param=value
+	lsh := LSH.NewCosDistanceEncoder(4, 8)
+	db, err := vectorDatabase.NewVectorDb("root:123456@tcp(localhost:3306)/test_db?charset=utf8", lsh)
 	if err != nil {
 		return
 	}
-	defer db.Close()
 	fmt.Println(db, err)
 }
