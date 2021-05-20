@@ -1,16 +1,18 @@
 package vectorDatabase
 
 import (
+	"encoding/binary"
 	"errors"
 	"geeSearch/LSH"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"log"
 	"math"
+	"sort"
 )
 
 type vectorDb struct {
-	db *gorm.DB
+	db  *gorm.DB
 	lsh LSH.EncoderLSH
 }
 
@@ -22,7 +24,7 @@ func NewVectorDb(dataSource string, lsh LSH.EncoderLSH) (*vectorDb, error) {
 	}
 	_ = db.AutoMigrate(&Vector{})
 	return &vectorDb{
-		db: db,
+		db:  db,
 		lsh: lsh,
 	}, nil
 }
@@ -32,7 +34,8 @@ func (v *vectorDb) Insert(vec []float64) (id uint, err error) {
 	if err != nil {
 		return
 	}
-	vector := &Vector{Hash: hash}
+	bytes := v.vecToByte(vec)
+	vector := &Vector{Hash: hash, VecBytes: bytes}
 	tx := v.db.Create(vector)
 	if tx.RowsAffected != 1 {
 		err = errors.New("inserting error")
@@ -41,17 +44,42 @@ func (v *vectorDb) Insert(vec []float64) (id uint, err error) {
 	return vector.ID, nil
 }
 
-func (v *vectorDb) Search(vec []float64, topk int) ([]Vector) {
+func (v *vectorDb) Search(vec []float64, topk int) []Vector {
 	hash, err := v.lsh.Encode(vec)
 	if err != nil {
 		return nil
 	}
 	var vectors []Vector
-	v.db.Where("hash = ?", hash).Find(vectors)
-	for i:=0 ; i <= v.lsh.Len() && len(vectors) <= topk; i++ {
+	v.db.Where("hash = ?", hash).Find(&vectors)
+	for i := 1; i <= v.lsh.Len() && len(vectors) < topk; i++ {
 		var mask uint64
-		mask = math.MaxUint64 >> (64 - i + 1)
-		v.db.Where("hash BETWEEN ? and ?", mask ^ hash, mask | hash).Find(vectors)
+		mask = math.MaxUint64 << i
+		v.db.Where("hash BETWEEN ? and ?", mask&hash, (^mask)|hash).Find(&vectors)
 	}
-	return vectors
+	for i := 0; i < len(vectors); i++ {
+		vectors[i].Vec = v.byteToVec(vectors[i].VecBytes)
+		vectors[i].Dis = LSH.GetAngle(vectors[i].Vec, vec) // cos similarity
+	}
+	sort.Slice(vectors, func(i, j int) bool {
+		return vectors[i].Dis < vectors[j].Dis
+	})
+	return vectors[0:topk]
+}
+
+func (v *vectorDb) vecToByte(vec []float64) []byte {
+	bytes := make([]byte, 8*len(vec))
+	for i, ve := range vec {
+		bits := math.Float64bits(ve)
+		binary.LittleEndian.PutUint64(bytes[i*8:(i+1)*8], bits)
+	}
+	return bytes
+}
+
+func (v *vectorDb) byteToVec(vec []byte) []float64 {
+	vecFloat := make([]float64, len(vec)/8)
+	for i := 0; i < len(vec)/8; i++ {
+		bits := binary.LittleEndian.Uint64(vec[i*8 : (i+1)*8])
+		vecFloat[i] = math.Float64frombits(bits)
+	}
+	return vecFloat
 }
