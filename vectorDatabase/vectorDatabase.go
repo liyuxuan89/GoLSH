@@ -58,7 +58,7 @@ func (v *vectorDb) Search(vec []float64, topk int) []Vector {
 	}
 	for i := 0; i < len(vectors); i++ {
 		vectors[i].Vec = v.byteToVec(vectors[i].VecBytes)
-		vectors[i].Dis = LSH.GetAngle(vectors[i].Vec, vec) // cos similarity
+		vectors[i].Dis = v.lsh.Distance(vectors[i].Vec, vec) // cos similarity
 	}
 	sort.Slice(vectors, func(i, j int) bool {
 		return vectors[i].Dis < vectors[j].Dis

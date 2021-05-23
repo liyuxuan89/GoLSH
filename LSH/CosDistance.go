@@ -11,6 +11,8 @@ type CosDistanceEncoder struct {
 	baseNum int
 }
 
+var _ EncoderLSH = (*CosDistanceEncoder)(nil)
+
 func NewCosDistanceEncoder(vecLen int, baseNum int) *CosDistanceEncoder {
 	base := make([][]float64, baseNum)
 	for i := 0; i < baseNum; i++ {
@@ -45,4 +47,12 @@ func (c *CosDistanceEncoder) Encode(vec []float64) (uint64, error) {
 
 func (c *CosDistanceEncoder) Len() int {
 	return c.baseNum
+}
+
+func (c *CosDistanceEncoder) Distance(vec1 []float64, vec2 []float64) float64 {
+	dotProduct := DotProduct(vec1, vec2)
+	lenVec1 := GetLength(vec1)
+	lenVec2 := GetLength(vec2)
+	dis := 1 - (dotProduct/(lenVec1*lenVec2)+1)/2
+	return dis
 }
