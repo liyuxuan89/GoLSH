@@ -9,7 +9,7 @@ import (
 
 func BenchmarkSearch(b *testing.B) {
 	b.StopTimer()
-	lsh := LSH.NewCosDistanceEncoder(2, 32)
+	lsh := LSH.NewCosDistanceEncoder(768, 32)
 	db, err := NewVectorDb("root:123456@tcp(localhost:3306)/test_db?charset=utf8", lsh)
 	if err != nil {
 		b.Fatal("init error", err)
@@ -18,7 +18,7 @@ func BenchmarkSearch(b *testing.B) {
 	rand.Seed(time.Now().UnixNano())
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		vec := make([]float64, 2)
+		vec := make([]float64, 768)
 		for j := 0; j < len(vec); j++ {
 			vec[j] = float64(rand.Intn(100) - 50)
 		}
@@ -28,7 +28,7 @@ func BenchmarkSearch(b *testing.B) {
 
 func BenchmarkSearchParallel(b *testing.B) {
 	b.StopTimer()
-	lsh := LSH.NewCosDistanceEncoder(2, 32)
+	lsh := LSH.NewCosDistanceEncoder(768, 32)
 	db, err := NewVectorDb("root:123456@tcp(localhost:3306)/test_db?charset=utf8", lsh)
 	if err != nil {
 		b.Fatal("init error", err)
@@ -39,7 +39,7 @@ func BenchmarkSearchParallel(b *testing.B) {
 	b.SetParallelism(8)
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			vec := make([]float64, 2)
+			vec := make([]float64, 768)
 			for j := 0; j < len(vec); j++ {
 				vec[j] = float64(rand.Intn(100) - 50)
 			}

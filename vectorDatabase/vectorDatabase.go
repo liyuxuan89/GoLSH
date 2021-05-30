@@ -11,31 +11,31 @@ import (
 	"sort"
 )
 
-type vectorDb struct {
+type VectorDb struct {
 	db  *gorm.DB
 	lsh LSH.EncoderLSH
 }
 
-func NewVectorDb(dataSource string, lsh LSH.EncoderLSH) (*vectorDb, error) {
+func NewVectorDb(dataSource string, lsh LSH.EncoderLSH) (*VectorDb, error) {
 	db, err := gorm.Open(mysql.Open(dataSource), &gorm.Config{})
 	if err != nil {
 		log.Fatal("Db error: ", err)
 		return nil, err
 	}
 	_ = db.AutoMigrate(&Vector{})
-	return &vectorDb{
+	return &VectorDb{
 		db:  db,
 		lsh: lsh,
 	}, nil
 }
 
-func (v *vectorDb) Insert(vec []float64) (id uint, err error) {
+func (v *VectorDb) Insert(vec []float64, url string) (id uint, err error) {
 	hash, err := v.lsh.Encode(vec)
 	if err != nil {
 		return
 	}
 	bytes := v.vecToByte(vec)
-	vector := &Vector{Hash: hash, VecBytes: bytes}
+	vector := &Vector{Hash: hash, VecBytes: bytes, Url: url}
 	tx := v.db.Create(vector)
 	if tx.RowsAffected != 1 {
 		err = errors.New("inserting error")
@@ -44,7 +44,7 @@ func (v *vectorDb) Insert(vec []float64) (id uint, err error) {
 	return vector.ID, nil
 }
 
-func (v *vectorDb) Search(vec []float64, topk int) []Vector {
+func (v *VectorDb) Search(vec []float64, topk int) []Vector {
 	hash, err := v.lsh.Encode(vec)
 	if err != nil {
 		return nil
@@ -66,7 +66,7 @@ func (v *vectorDb) Search(vec []float64, topk int) []Vector {
 	return vectors[0:topk]
 }
 
-func (v *vectorDb) vecToByte(vec []float64) []byte {
+func (v *VectorDb) vecToByte(vec []float64) []byte {
 	bytes := make([]byte, 8*len(vec))
 	for i, ve := range vec {
 		bits := math.Float64bits(ve)
@@ -75,7 +75,7 @@ func (v *vectorDb) vecToByte(vec []float64) []byte {
 	return bytes
 }
 
-func (v *vectorDb) byteToVec(vec []byte) []float64 {
+func (v *VectorDb) byteToVec(vec []byte) []float64 {
 	vecFloat := make([]float64, len(vec)/8)
 	for i := 0; i < len(vec)/8; i++ {
 		bits := binary.LittleEndian.Uint64(vec[i*8 : (i+1)*8])
