@@ -12,9 +12,9 @@ import (
 	"strings"
 )
 
-func insertData(db *vectorDatabase.VectorDb)  {
+func insertData(db *vectorDatabase.VectorDb) {
 	// read from file
-	f, err := os.Open("./main/landscape1000.txt")
+	f, err := os.Open("./main/urls.txt")
 	if err != nil {
 		log.Fatal("open file error " + err.Error())
 	}
@@ -51,7 +51,7 @@ func getData(url string) []float64 {
 func main() {
 	// username:password@protocol(address)/dbname?param=value
 	lsh := LSH.NewCosDistanceEncoder(768, 32)
-	db, err := vectorDatabase.NewVectorDb("root:123456@tcp(localhost:3306)/test_db?charset=utf8", lsh)
+	db, err := vectorDatabase.NewVectorDb("root:123456@tcp(localhost:3306)/serve_db?charset=utf8", lsh)
 	if err != nil {
 		return
 	}

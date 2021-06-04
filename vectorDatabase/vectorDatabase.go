@@ -11,9 +11,13 @@ import (
 	"sort"
 )
 
+const defaultRetrievalNumber = 1000
+
 type VectorDb struct {
-	db  *gorm.DB
-	lsh LSH.EncoderLSH
+	db    *gorm.DB
+	lsh   LSH.EncoderLSH
+	count int64
+	skip  int
 }
 
 func NewVectorDb(dataSource string, lsh LSH.EncoderLSH) (*VectorDb, error) {
@@ -23,10 +27,38 @@ func NewVectorDb(dataSource string, lsh LSH.EncoderLSH) (*VectorDb, error) {
 		return nil, err
 	}
 	_ = db.AutoMigrate(&Vector{})
+	var count int64
+	db.Model(&Vector{}).Count(&count)
+	skip := lsh.Len() - int(math.Log2(float64(count)/50))
 	return &VectorDb{
-		db:  db,
-		lsh: lsh,
+		db:    db,
+		lsh:   lsh,
+		count: count,
+		skip:  skip,
 	}, nil
+}
+
+func (v *VectorDb) InsertBatch(vecs [][]float64, urls []string) (ids []uint, errs []error) {
+	insertItems := make([]*Vector, len(vecs))
+	errs = make([]error, len(vecs))
+
+	for i := 0; i < len(vecs); i++ {
+		hash, err := v.lsh.Encode(vecs[i])
+		if err != nil {
+			errs[i] = err
+		}
+		bytes := v.vecToByte(vecs[i])
+		vector := &Vector{Hash: hash, VecBytes: bytes, Url: urls[i]}
+		insertItems[i] = vector
+	}
+	tx := v.db.Create(insertItems)
+	v.count += tx.RowsAffected
+	v.skip = v.lsh.Len() - int(math.Log2(float64(v.count)))
+	ids = make([]uint, len(vecs))
+	for i, item := range insertItems {
+		ids[i] = item.ID
+	}
+	return
 }
 
 func (v *VectorDb) Insert(vec []float64, url string) (id uint, err error) {
@@ -41,6 +73,8 @@ func (v *VectorDb) Insert(vec []float64, url string) (id uint, err error) {
 		err = errors.New("inserting error")
 		return
 	}
+	v.count += 1
+	v.skip = v.lsh.Len() - int(math.Log2(float64(v.count)))
 	return vector.ID, nil
 }
 
@@ -50,12 +84,21 @@ func (v *VectorDb) Search(vec []float64, topk int) []Vector {
 		return nil
 	}
 	var vectors []Vector
-	v.db.Where("hash = ?", hash).Find(&vectors)
-	for i := 1; i <= v.lsh.Len() && len(vectors) < topk; i++ {
+	var skip int
+	if v.skip <= 0 {
+		v.db.Where("hash = ?", hash).Find(&vectors)
+		skip = 1
+	} else {
+		skip = v.skip
+	}
+	//startTime := time.Now()
+	for i := skip; i <= v.lsh.Len() && len(vectors) < topk; i++ {
+		//fmt.Println(i)
 		var mask uint64
 		mask = math.MaxUint64 << i
-		v.db.Where("hash BETWEEN ? and ?", mask&hash, (^mask)|hash).Find(&vectors)
+		v.db.Where("hash BETWEEN ? and ?", mask&hash, (^mask)|hash).Limit(defaultRetrievalNumber).Find(&vectors)
 	}
+	//fmt.Println("query time:", time.Since(startTime), len(vectors))
 	for i := 0; i < len(vectors); i++ {
 		vectors[i].Vec = v.byteToVec(vectors[i].VecBytes)
 		vectors[i].Dis = v.lsh.Distance(vectors[i].Vec, vec) // cos similarity
