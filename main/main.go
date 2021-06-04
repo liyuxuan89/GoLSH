@@ -1,16 +1,24 @@
 package main
 
 import (
-	"fmt"
+	"bytes"
 	"geeSearch/ImageColor"
 	"geeSearch/LSH"
 	"geeSearch/vectorDatabase"
+	"github.com/gin-gonic/gin"
+	"github.com/vincent-petithory/dataurl"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"strings"
 )
+
+type SearchQuery struct {
+	DataUrl string `json:"dataUrl"`
+	Offset  int    `json:"offset"`
+	Limit   int    `json:"limit"`
+}
 
 func insertData(db *vectorDatabase.VectorDb) {
 	// read from file
@@ -53,26 +61,31 @@ func main() {
 	lsh := LSH.NewCosDistanceEncoder(768, 32)
 	db, err := vectorDatabase.NewVectorDb("root:123456@tcp(localhost:3306)/serve_db?charset=utf8", lsh)
 	if err != nil {
-		return
+		log.Fatal("error init database !")
 	}
-	fs, _ := os.Open("./main/test.jpg")
-	im, err := ImageColor.NewIm(fs)
-	if err != nil {
-		return
-	}
-	hist := im.ExtractColor()
-	ret := db.Search(hist, 10)
-	for _, r := range ret {
-		fmt.Println(r.Url)
-	}
-
-	//insertData(db)
-	//fmt.Println(db, err)
-	//for i:=0; i<100; i++ {
-	//	for j:=0; j<100; j++ {
-	//		_, _ = db.Insert([]float64{float64(i)-50, float64(j)-50})
-	//	}
-	//}
-	//ret := db.Search([]float64{1, 3}, 10)
-	//fmt.Println(ret)
+	router := gin.Default()
+	router.POST("/search", func(c *gin.Context) {
+		json := SearchQuery{}
+		_ = c.BindJSON(&json)
+		dataURL, err := dataurl.DecodeString(json.DataUrl)
+		if err != nil {
+			c.String(http.StatusInternalServerError, "parse data url error")
+			return
+		}
+		im, err := ImageColor.NewIm(bytes.NewReader(dataURL.Data))
+		if err != nil {
+			c.String(http.StatusInternalServerError, "parse image error")
+			return
+		}
+		hist := im.ExtractColor()
+		ret := db.Search(hist, json.Limit+json.Offset)
+		urls := make([]string, json.Limit)
+		for i := 0; i < json.Limit; i++ {
+			urls[i] = ret[i+json.Offset].Url
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"imageUrls": urls,
+		})
+	})
+	_ = router.Run(":8080")
 }
