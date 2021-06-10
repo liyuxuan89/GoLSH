@@ -11,7 +11,7 @@ import (
 	"sort"
 )
 
-const defaultRetrievalNumber = 1000
+const defaultRetrievalNumber = 200
 
 type VectorDb struct {
 	db    *gorm.DB
@@ -29,7 +29,7 @@ func NewVectorDb(dataSource string, lsh LSH.EncoderLSH) (*VectorDb, error) {
 	_ = db.AutoMigrate(&Vector{})
 	var count int64
 	db.Model(&Vector{}).Count(&count)
-	skip := lsh.Len() - int(math.Log2(float64(count)/50))
+	skip := lsh.Len() - int(math.Log2(float64(count)*50))
 	return &VectorDb{
 		db:    db,
 		lsh:   lsh,
@@ -53,7 +53,7 @@ func (v *VectorDb) InsertBatch(vecs [][]float64, urls []string) (ids []uint, err
 	}
 	tx := v.db.Create(insertItems)
 	v.count += tx.RowsAffected
-	v.skip = v.lsh.Len() - int(math.Log2(float64(v.count)))
+	v.skip = v.lsh.Len() - int(math.Log2(float64(v.count)*50))
 	ids = make([]uint, len(vecs))
 	for i, item := range insertItems {
 		ids[i] = item.ID
@@ -74,7 +74,7 @@ func (v *VectorDb) Insert(vec []float64, url string) (id uint, err error) {
 		return
 	}
 	v.count += 1
-	v.skip = v.lsh.Len() - int(math.Log2(float64(v.count)))
+	v.skip = v.lsh.Len() - int(math.Log2(float64(v.count)*50))
 	return vector.ID, nil
 }
 
@@ -98,7 +98,7 @@ func (v *VectorDb) Search(vec []float64, topk int) []Vector {
 		mask = math.MaxUint64 << i
 		v.db.Where("hash BETWEEN ? and ?", mask&hash, (^mask)|hash).Limit(defaultRetrievalNumber).Find(&vectors)
 	}
-	//fmt.Println("query time:", time.Since(startTime), len(vectors))
+	//fmt.Println("query time:", time.Since(startTime), len(vectors), skip)
 	for i := 0; i < len(vectors); i++ {
 		vectors[i].Vec = v.byteToVec(vectors[i].VecBytes)
 		vectors[i].Dis = v.lsh.Distance(vectors[i].Vec, vec) // cos similarity

@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="601a9737-1df1-4594-9614-0af1a0ba6ee4" name="Default Changelist" comment="">
+    <list default="true" id="601a9737-1df1-4594-9614-0af1a0ba6ee4" name="Default Changelist" comment="doc: add benchmark test">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/go.mod" beforeDir="false" afterPath="$PROJECT_DIR$/go.mod" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/go.sum" beforeDir="false" afterPath="$PROJECT_DIR$/go.sum" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/main/main.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/vectorDatabase/vectorDatabase.go" beforeDir="false" afterPath="$PROJECT_DIR$/vectorDatabase/vectorDatabase.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/vectorDatabase/vectorDatabase_test.go" beforeDir="false" afterPath="$PROJECT_DIR$/vectorDatabase/vectorDatabase_test.go" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -109,10 +110,10 @@
     <recent_temporary>
       <list>
         <item itemvalue="Go Build.go build geeSearch/main" />
+        <item itemvalue="Go Test.BenchmarkSearch in geeSearch/vectorDatabase" />
         <item itemvalue="Go Test.TestSearch in geeSearch/vectorDatabase" />
         <item itemvalue="Go Test.TestInsert in geeSearch/vectorDatabase" />
         <item itemvalue="Go Test.BenchmarkSearchParallel in geeSearch/vectorDatabase" />
-        <item itemvalue="Go Test.BenchmarkSearch in geeSearch/vectorDatabase" />
       </list>
     </recent_temporary>
   </component>
@@ -126,7 +127,8 @@
     <MESSAGE value="feat:add benchmark test" />
     <MESSAGE value="feat:modify benchmark test" />
     <MESSAGE value="feat:limit retrieval rows, limit query number" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat:limit retrieval rows, limit query number" />
+    <MESSAGE value="feat:add server" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat:add server" />
   </component>
   <component name="VgoProject">
     <integration-enabled>true</integration-enabled>

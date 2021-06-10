@@ -9,6 +9,7 @@ import (
 	"github.com/vincent-petithory/dataurl"
 	"io"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
 	"strings"
@@ -58,8 +59,9 @@ func getData(url string) []float64 {
 
 func main() {
 	// username:password@protocol(address)/dbname?param=value
-	lsh := LSH.NewCosDistanceEncoder(768, 32)
-	db, err := vectorDatabase.NewVectorDb("root:123456@tcp(localhost:3306)/serve_db?charset=utf8", lsh)
+	lsh := LSH.NewCosDistanceEncoder(32, 32)
+	//db, err := vectorDatabase.NewVectorDb("root:123456@tcp(localhost:3306)/serve_db?charset=utf8", lsh)
+	db, err := vectorDatabase.NewVectorDb("root:123456@tcp(localhost:3306)/test_db?charset=utf8", lsh)
 	if err != nil {
 		log.Fatal("error init database !")
 	}
@@ -85,6 +87,17 @@ func main() {
 		}
 		c.JSON(http.StatusOK, gin.H{
 			"imageUrls": urls,
+		})
+	})
+
+	router.POST("/test", func(c *gin.Context) {
+		vec := make([]float64, 32)
+		for j := 0; j < len(vec); j++ {
+			vec[j] = float64(rand.Intn(100) - 50)
+		}
+		ret := db.Search(vec, 10)
+		c.JSON(http.StatusOK, gin.H{
+			"retrievals": len(ret),
 		})
 	})
 	_ = router.Run(":8080")
