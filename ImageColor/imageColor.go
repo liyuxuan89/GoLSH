@@ -29,7 +29,7 @@ func NewIm(reader io.Reader) (*IM, error) {
 }
 
 func (im *IM) ExtractColor() []float64 {
-	// sample pixels
+	// sample pixels, extract 786 dim feature
 	bounds := im.Im.Bounds()
 	stepX := (bounds.Max.X - bounds.Min.X)/16
 	stepY := (bounds.Max.Y - bounds.Min.Y)/16

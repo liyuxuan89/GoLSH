@@ -1,37 +1,59 @@
 package vectorDatabase
 
 import (
+	"context"
+	"encoding/base64"
 	"encoding/binary"
 	"errors"
 	"geeSearch/LSH"
+	"github.com/go-redis/redis/v8"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"log"
 	"math"
 	"sort"
+	"strconv"
 )
 
 const defaultRetrievalNumber = 200
+var ctx = context.Background()
 
 type VectorDb struct {
 	db    *gorm.DB
+	rdb	  *redis.Client
 	lsh   LSH.EncoderLSH
 	count int64
 	skip  int
 }
 
-func NewVectorDb(dataSource string, lsh LSH.EncoderLSH) (*VectorDb, error) {
+func NewVectorDb(dataSource, redisAddr string, lsh LSH.EncoderLSH) (*VectorDb, error) {
+	// 1. connect to mysql
 	db, err := gorm.Open(mysql.Open(dataSource), &gorm.Config{})
 	if err != nil {
 		log.Fatal("Db error: ", err)
 		return nil, err
 	}
 	_ = db.AutoMigrate(&Vector{})
+	log.Println("connect to mysql ", dataSource, " successfully")
+	// 2. connect to redis
+	rdb := redis.NewClient(&redis.Options{
+		Addr: redisAddr,
+		Password: "",
+		DB: 0,
+	})
+	_, err = rdb.Ping(ctx).Result()
+	if err != nil {
+		log.Fatal("redis error: ", err)
+		return nil, err
+	}
+	log.Println("connect to redis ", redisAddr, " successfully")
+	// 3. calculate entry number
 	var count int64
 	db.Model(&Vector{}).Count(&count)
 	skip := lsh.Len() - int(math.Log2(float64(count)*50))
 	return &VectorDb{
 		db:    db,
+		rdb:   rdb,
 		lsh:   lsh,
 		count: count,
 		skip:  skip,
@@ -83,22 +105,57 @@ func (v *VectorDb) Search(vec []float64, topk int) []Vector {
 	if err != nil {
 		return nil
 	}
-	var vectors []Vector
 	var skip int
 	if v.skip <= 0 {
-		v.db.Where("hash = ?", hash).Find(&vectors)
-		skip = 1
+		skip = 0
 	} else {
 		skip = v.skip
 	}
-	//startTime := time.Now()
-	for i := skip; i <= v.lsh.Len() && len(vectors) < topk; i++ {
-		//fmt.Println(i)
-		var mask uint64
+	var vectors []Vector
+	//1. query redis first
+	var cacheHit bool
+	var values []string
+	var mask uint64 = math.MaxUint64
+	for i := skip; i <= v.lsh.Len() && len(values) < topk; i++ {
 		mask = math.MaxUint64 << i
-		v.db.Where("hash BETWEEN ? and ?", mask&hash, (^mask)|hash).Limit(defaultRetrievalNumber).Find(&vectors)
+		values, err = v.rdb.SMembers(ctx, "skip" + strconv.Itoa(i) + "+hash" + strconv.FormatUint(hash&mask, 10)).Result()
 	}
-	//fmt.Println("query time:", time.Since(startTime), len(vectors), skip)
+	if err == nil && len(values) >= topk {
+		for _, val :=  range values {
+			row, err := v.rdb.HGetAll(ctx, val+"+vector").Result()
+			if err == nil {
+				id, err := strconv.ParseUint(val, 10, 64)
+				vecBytes, err := base64.StdEncoding.DecodeString(row["base64"])
+				if err != nil {continue}
+				vectors = append(vectors, Vector{ID: uint(id), VecBytes: vecBytes, Url: row["url"]})
+			}
+		}
+		if len(vectors) >= topk {
+			log.Println("cache hit !!!")
+			cacheHit = true
+		}
+	}
+	// 2. query database
+	if !cacheHit {
+		log.Println("cache miss !!!")
+		mask = math.MaxUint64
+		for i := skip; i <= v.lsh.Len() && len(vectors) < topk; i++ {
+			mask = math.MaxUint64 << i
+			skip = i
+			v.db.Where("hash BETWEEN ? and ?", mask&hash, (^mask)|hash).Limit(defaultRetrievalNumber).Find(&vectors)
+		}
+		for _, vec := range vectors {
+			encodeString := base64.StdEncoding.EncodeToString(vec.VecBytes)
+			err = v.rdb.HSet(ctx, strconv.FormatUint(uint64(vec.ID), 10)+"+vector",
+				"base64", encodeString, "url", vec.Url).Err()
+			if err != nil {
+				continue
+			}
+			v.rdb.SAdd(ctx, "skip" + strconv.Itoa(skip) + "+hash" + strconv.FormatUint(hash&mask, 10),
+				strconv.FormatUint(uint64(vec.ID), 10))
+		}
+	}
+	// 3. order by distance
 	for i := 0; i < len(vectors); i++ {
 		vectors[i].Vec = v.byteToVec(vectors[i].VecBytes)
 		vectors[i].Dis = v.lsh.Distance(vectors[i].Vec, vec) // cos similarity

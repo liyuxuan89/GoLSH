@@ -12,7 +12,7 @@ const baseNum = 32
 
 func TestInsert(t *testing.T) {
 	lsh := LSH.NewCosDistanceEncoder(vecLen, baseNum)
-	db, err := NewVectorDb("root:123456@tcp(localhost:3306)/test_db?charset=utf8", lsh)
+	db, err := NewVectorDb("root:123456@tcp(localhost:3306)/test_db?charset=utf8", "localhost:6379", lsh)
 	if err != nil {
 		t.Fatal("init error", err)
 		return
@@ -38,7 +38,7 @@ func TestInsert(t *testing.T) {
 func BenchmarkSearch(b *testing.B) {
 	b.StopTimer()
 	lsh := LSH.NewCosDistanceEncoder(vecLen, baseNum)
-	db, err := NewVectorDb("root:123456@tcp(localhost:3306)/test_db?charset=utf8", lsh)
+	db, err := NewVectorDb("root:123456@tcp(localhost:3306)/test_db?charset=utf8", "localhost:6379", lsh)
 	if err != nil {
 		b.Fatal("init error", err)
 		return
@@ -57,7 +57,7 @@ func BenchmarkSearch(b *testing.B) {
 func BenchmarkSearchParallel(b *testing.B) {
 	b.StopTimer()
 	lsh := LSH.NewCosDistanceEncoder(vecLen, baseNum)
-	db, err := NewVectorDb("root:123456@tcp(localhost:3306)/test_db?charset=utf8", lsh)
+	db, err := NewVectorDb("root:123456@tcp(localhost:3306)/test_db?charset=utf8", "localhost:6379", lsh)
 	if err != nil {
 		b.Fatal("init error", err)
 		return

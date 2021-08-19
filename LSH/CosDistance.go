@@ -14,6 +14,7 @@ type CosDistanceEncoder struct {
 var _ EncoderLSH = (*CosDistanceEncoder)(nil)
 
 func NewCosDistanceEncoder(vecLen int, baseNum int) *CosDistanceEncoder {
+	// default baseNum is 32
 	base := make([][]float64, baseNum)
 	for i := 0; i < baseNum; i++ {
 		base[i] = make([]float64, vecLen)
