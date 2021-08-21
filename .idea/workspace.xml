@@ -3,14 +3,10 @@
   <component name="ChangeListManager">
     <list default="true" id="601a9737-1df1-4594-9614-0af1a0ba6ee4" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ImageColor/imageColor.go" beforeDir="false" afterPath="$PROJECT_DIR$/ImageColor/imageColor.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/LSH/CosDistance.go" beforeDir="false" afterPath="$PROJECT_DIR$/LSH/CosDistance.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/go.mod" beforeDir="false" afterPath="$PROJECT_DIR$/go.mod" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/go.sum" beforeDir="false" afterPath="$PROJECT_DIR$/go.sum" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/main/main.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/vectorDatabase/tables.go" beforeDir="false" afterPath="$PROJECT_DIR$/vectorDatabase/tables.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/vectorDatabase/vectorDatabase.go" beforeDir="false" afterPath="$PROJECT_DIR$/vectorDatabase/vectorDatabase.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/vectorDatabase/vectorDatabase_test.go" beforeDir="false" afterPath="$PROJECT_DIR$/vectorDatabase/vectorDatabase_test.go" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -27,6 +23,11 @@
   </component>
   <component name="GOROOT" url="file:///usr/local/go" />
   <component name="Git.Settings">
+    <option name="RECENT_BRANCH_BY_REPOSITORY">
+      <map>
+        <entry key="$PROJECT_DIR$" value="origin" />
+      </map>
+    </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="GitSEFilterConfiguration">

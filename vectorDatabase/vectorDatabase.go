@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"geeSearch/LSH"
 	"github.com/go-redis/redis/v8"
 	"gorm.io/driver/mysql"
@@ -13,14 +14,16 @@ import (
 	"math"
 	"sort"
 	"strconv"
+	"strings"
 )
 
 const defaultRetrievalNumber = 200
+
 var ctx = context.Background()
 
 type VectorDb struct {
 	db    *gorm.DB
-	rdb	  *redis.Client
+	rdb   *redis.Client
 	lsh   LSH.EncoderLSH
 	count int64
 	skip  int
@@ -37,9 +40,9 @@ func NewVectorDb(dataSource, redisAddr string, lsh LSH.EncoderLSH) (*VectorDb, e
 	log.Println("connect to mysql ", dataSource, " successfully")
 	// 2. connect to redis
 	rdb := redis.NewClient(&redis.Options{
-		Addr: redisAddr,
+		Addr:     redisAddr,
 		Password: "",
-		DB: 0,
+		DB:       0,
 	})
 	_, err = rdb.Ping(ctx).Result()
 	if err != nil {
@@ -115,19 +118,59 @@ func (v *VectorDb) Search(vec []float64, topk int) []Vector {
 	//1. query redis first
 	var cacheHit bool
 	var values []string
+	var count int64
 	var mask uint64 = math.MaxUint64
-	for i := skip; i <= v.lsh.Len() && len(values) < topk; i++ {
+	for i := skip; i <= v.lsh.Len() && count < int64(topk); i++ {
 		mask = math.MaxUint64 << i
-		values, err = v.rdb.SMembers(ctx, "skip" + strconv.Itoa(i) + "+hash" + strconv.FormatUint(hash&mask, 10)).Result()
+		count = 0
+		values, err = v.rdb.ZRangeByScore(ctx, "range",
+			&redis.ZRangeBy{Min: strconv.FormatUint(mask&hash, 10),
+				Max: strconv.FormatUint((^mask)|hash, 10)}).Result()
+		for _, str := range values {
+			add, err := strconv.ParseInt(strings.Split(str, "+")[0], 10, 64)
+			if err != nil {
+				continue
+			}
+			count += add
+		}
+		// log.Println(i, count, values, int64(hash&mask), int64((^mask)|hash))
 	}
-	if err == nil && len(values) >= topk {
-		for _, val :=  range values {
-			row, err := v.rdb.HGetAll(ctx, val+"+vector").Result()
+	if count >= int64(topk) {
+		queryResults1 := make([]*redis.StringSliceCmd, len(values))
+		pipe := v.rdb.Pipeline()
+		for i, str := range values {
+			queryHash := "hash+" + strings.Split(str, "+")[1]
+			queryResults1[i] = pipe.SMembers(ctx, queryHash)
+		}
+		_, err := pipe.Exec(ctx)
+		ids := make([]string, 0)
+		if err == nil {
+			for _, res := range queryResults1 {
+				ids_, err := res.Result()
+				if err == nil {
+					ids = append(ids, ids_...)
+				}
+			}
+		}
+		queryResults2 := make([]*redis.StringStringMapCmd, len(ids))
+		if len(ids) >= topk {
+			for i, id := range ids {
+				queryResults2[i] = pipe.HGetAll(ctx, "vector+"+id)
+			}
+			_, err = pipe.Exec(ctx)
 			if err == nil {
-				id, err := strconv.ParseUint(val, 10, 64)
-				vecBytes, err := base64.StdEncoding.DecodeString(row["base64"])
-				if err != nil {continue}
-				vectors = append(vectors, Vector{ID: uint(id), VecBytes: vecBytes, Url: row["url"]})
+				for i, res := range queryResults2 {
+					row, err := res.Result()
+					if err == nil {
+						id, err := strconv.ParseUint(ids[i], 10, 64)
+						vecBytes, err := base64.StdEncoding.DecodeString(row["base64"])
+						if err != nil {
+							continue
+						}
+						vectors = append(vectors, Vector{ID: uint(id), VecBytes: vecBytes, Url: row["url"]})
+					}
+				}
+
 			}
 		}
 		if len(vectors) >= topk {
@@ -143,16 +186,39 @@ func (v *VectorDb) Search(vec []float64, topk int) []Vector {
 			mask = math.MaxUint64 << i
 			skip = i
 			v.db.Where("hash BETWEEN ? and ?", mask&hash, (^mask)|hash).Limit(defaultRetrievalNumber).Find(&vectors)
+			log.Println(skip, len(vectors))
 		}
+		// add to cache
+		sortByHash := make(map[uint64][]Vector)
 		for _, vec := range vectors {
-			encodeString := base64.StdEncoding.EncodeToString(vec.VecBytes)
-			err = v.rdb.HSet(ctx, strconv.FormatUint(uint64(vec.ID), 10)+"+vector",
-				"base64", encodeString, "url", vec.Url).Err()
-			if err != nil {
-				continue
+			if _, ok := sortByHash[vec.Hash]; !ok {
+				sortByHash[vec.Hash] = make([]Vector, 0)
 			}
-			v.rdb.SAdd(ctx, "skip" + strconv.Itoa(skip) + "+hash" + strconv.FormatUint(hash&mask, 10),
-				strconv.FormatUint(uint64(vec.ID), 10))
+			sortByHash[vec.Hash] = append(sortByHash[vec.Hash], vec)
+		}
+		pipe := v.rdb.Pipeline()
+		for key, val := range sortByHash {
+			for _, vec := range val {
+				encodeString := base64.StdEncoding.EncodeToString(vec.VecBytes)
+				err = pipe.SAdd(ctx, "hash+"+strconv.FormatUint(key, 10),
+					strconv.FormatUint(uint64(vec.ID), 10)).Err()
+				if err != nil {
+					log.Println("redis error:", err)
+					continue
+				}
+				err = pipe.HSet(ctx, "vector+"+strconv.FormatUint(uint64(vec.ID), 10),
+					"base64", encodeString, "url", vec.Url).Err()
+				if err != nil {
+					log.Println("redis error:", err)
+					continue
+				}
+			}
+			err = pipe.ZAdd(ctx, "range", &redis.Z{Score: float64(key),
+				Member: fmt.Sprintf("%d+%d", len(val), key)}).Err()
+		}
+		_, err := pipe.Exec(ctx)
+		if err != nil {
+			log.Println("caching fail")
 		}
 	}
 	// 3. order by distance

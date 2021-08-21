@@ -102,7 +102,7 @@ func main() {
 
 	router.POST("/test", func(c *gin.Context) {
 		vec := make([]float64, 32)
-		rand.Seed(1024)
+		rand.Seed(0)
 		for j := 0; j < len(vec); j++ {
 			vec[j] = float64(rand.Intn(100) - 50)
 		}
@@ -111,5 +111,6 @@ func main() {
 			"retrievals": len(ret),
 		})
 	})
+	//pprof.Register(router)
 	_ = router.Run(":8080")
 }
