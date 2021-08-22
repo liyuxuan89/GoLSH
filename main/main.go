@@ -61,16 +61,16 @@ func main() {
 	// username:password@protocol(address)/dbname?param=value
 
 	//1. deploy
-	//lsh := LSH.NewCosDistanceEncoder(768, 32)
-	//db, err := vectorDatabase.NewVectorDb(
-	//	"root:123456@tcp(localhost:3306)/serve_db?charset=utf8",
-	//	"localhost:6379", lsh)
+	lsh := LSH.NewCosDistanceEncoder(768, 32)
+	db, err := vectorDatabase.NewVectorDb(
+		"root:123456@tcp(localhost:3306)/serve_db?charset=utf8",
+		"localhost:6379", lsh)
 
 	// 2. test
-	lsh := LSH.NewCosDistanceEncoder(32, 32)
-	db, err := vectorDatabase.NewVectorDb(
-		"root:123456@tcp(localhost:3306)/test_db?charset=utf8",
-		"localhost:6379", lsh)
+	//lsh := LSH.NewCosDistanceEncoder(32, 32)
+	//db, err := vectorDatabase.NewVectorDb(
+	//	"root:123456@tcp(localhost:3306)/test_db?charset=utf8",
+	//	"localhost:6379", lsh)
 
 	if err != nil {
 		log.Fatal("error init database !")
